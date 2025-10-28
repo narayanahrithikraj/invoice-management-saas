@@ -1,19 +1,23 @@
 import React, { useState, useEffect, useContext } from 'react';
-import InvoiceForm from '../InvoiceForm'; // Correct path relative to src/pages
-import InvoiceList from '../InvoiceList'; // Correct path relative to src/pages
-import { Typography, Box, Paper, Divider } from '@mui/material'; // Removed unused Button, Input, Alert, CircularProgress
+import InvoiceForm from '../InvoiceForm';
+import InvoiceList from '../InvoiceList';
+import { Typography, Box, Paper, Divider, Button, Input, Alert, CircularProgress } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
-// Removed CloudUploadIcon and InvoiceReviewModal imports
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+// import InvoiceReviewModal from '../components/InvoiceReviewModal'; // Keep commented out as OCR was removed
 
 function HomePage() {
   const [invoices, setInvoices] = useState([]);
   const token = localStorage.getItem('token');
   const { username } = useContext(AuthContext);
 
-  // Fetch Invoices (Manually created)
+  // Removed state related to file upload and modal
+
+  // Fetch Invoices
   const getInvoices = () => {
      if (!token) { setInvoices([]); return; }
-     fetch('http://localhost:5000/api/invoices', {
+     // Use environment variable for API URL
+     fetch(`${process.env.REACT_APP_API_URL}/api/invoices`, {
          method: 'GET',
          headers: { 'Content-Type': 'application/json', 'x-auth-token': token }
      })
@@ -30,11 +34,9 @@ function HomePage() {
   useEffect(() => {
     getInvoices();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]); // Re-fetch if token changes
-
+  }, [token]);
 
   // Removed handleFileChange, handleFileUpload, handleSaveVerifiedInvoice functions
-  // Removed state related to file upload and modal (selectedFile, uploadMessage, uploadError, isUploading, isReviewModalOpen, textToReview)
 
   return (
     <Box sx={{ paddingBottom: 4 }}>
@@ -52,14 +54,18 @@ function HomePage() {
       {/* Manual Invoice Creation Form */}
       <InvoiceForm onInvoiceCreated={getInvoices} />
 
-      {/* Removed the "OR" Divider and the entire "Upload Existing Invoice" Paper section */}
+      {/* Removed Upload Section */}
+      {/* <Divider sx={{ my: 4 }}>OR</Divider> */}
+      {/* <Paper...> ... </Paper> */}
 
-      <Divider sx={{ my: 4 }} /> {/* Keep this divider before the list */}
 
-      {/* Invoice List */}
+      <Divider sx={{ my: 4 }} />
+
+      {/* --- Invoice List --- */}
       <InvoiceList invoices={invoices} onListChange={getInvoices} />
 
-      {/* Removed the InvoiceReviewModal component instance */}
+      {/* Removed InvoiceReviewModal */}
+      {/* <InvoiceReviewModal ... /> */}
 
     </Box>
   );
