@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, TextField, Box, Typography, Paper, Alert, CircularProgress } from '@mui/material';
+import { Button, TextField, Box, Typography, Paper, Alert, CircularProgress } from '@mui/material'; // Added CircularProgress import
 import { Link } from 'react-router-dom'; // For back to login link
 
 function ForgotPasswordPage() {
