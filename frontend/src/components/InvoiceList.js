@@ -1,64 +1,120 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardActions, Typography, Button, Box, Chip } from '@mui/material';
+import { Card, CardContent, CardActions, Typography, Button, Box, Chip, Alert } from '@mui/material'; // Added Alert
 import jsPDF from 'jspdf';
 
 function InvoiceList({ invoices, onListChange }) {
   const [razorpayKeyId, setRazorpayKeyId] = useState('');
+  const [paymentError, setPaymentError] = useState(''); // State for payment errors
 
+  // Fetch Razorpay Key ID when component mounts
   useEffect(() => {
     const fetchKeyId = async () => {
       try {
         // Use environment variable for API URL
         const res = await fetch(`${process.env.REACT_APP_API_URL}/api/payments/get-key-id`);
-        if (!res.ok) throw new Error('Failed to fetch key');
+        if (!res.ok) throw new Error('Failed to fetch payment key');
         const data = await res.json();
         setRazorpayKeyId(data.keyId);
-      } catch (err) { console.error('Failed to fetch Razorpay key:', err); }
+      } catch (err) {
+        console.error('Failed to fetch Razorpay key:', err);
+        setPaymentError('Payment system unavailable.'); // Inform user
+      }
     };
     fetchKeyId();
-  }, []);
+  }, []); // Empty dependency array means run once on mount
 
+
+  // Function to handle initiating Razorpay payment
   const handlePayment = async (invoice) => {
+    setPaymentError(''); // Clear previous errors
     const token = localStorage.getItem('token');
-    if (!razorpayKeyId || !token) { alert('Payment system not ready or not logged in.'); return; }
+    if (!razorpayKeyId) {
+      setPaymentError('Payment system is not ready. Please try again.');
+      return;
+    }
+    if (!token) {
+        setPaymentError('Authentication error. Please log in again.');
+        return;
+    }
+
     try {
+      // 1. Create the order on your backend
       // Use environment variable for API URL
       const orderRes = await fetch(`${process.env.REACT_APP_API_URL}/api/payments/create-order`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-token': token
+        },
         body: JSON.stringify({ invoiceId: invoice._id })
       });
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.message || 'Failed to create order.');
 
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) {
+        throw new Error(orderData.message || 'Failed to create payment order.');
+      }
+
+      // 2. Configure Razorpay checkout options
       const options = {
-        key: razorpayKeyId, amount: orderData.amount, currency: orderData.currency,
-        name: 'My Invoice App', description: `Payment for Invoice #${invoice._id.slice(-6)}`,
+        key: razorpayKeyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: 'My Invoice App',
+        description: `Payment for Invoice #${invoice._id.slice(-6)}`,
         order_id: orderData.id,
         handler: async function (response) {
+          console.log('Razorpay Response:', response);
           try {
+            // 3. Send payment details to backend for verification
             // Use environment variable for API URL
             const verificationRes = await fetch(`${process.env.REACT_APP_API_URL}/api/payments/verify-payment`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
-              body: JSON.stringify(response)
+              headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              })
             });
+
             const verificationData = await verificationRes.json();
-            if (verificationData.success) { alert('Payment verified!'); onListChange(); }
-            else { alert(verificationData.message || 'Verification failed.'); }
-          } catch (verifyErr) { alert('Verification call failed.'); }
+
+            if (verificationData.success) {
+              alert('Payment verified successfully and invoice updated!');
+              onListChange(); // Refresh list
+            } else {
+               setPaymentError(verificationData.message || 'Payment verification failed.'); // Show specific error
+            }
+          } catch (verifyErr) {
+            console.error('Verification API call failed:', verifyErr);
+            setPaymentError('Payment verification failed after payment. Contact support.'); // Show error
+          }
         },
         prefill: { name: invoice.clientName, email: invoice.clientEmail },
+        notes: { invoice_id: invoice._id },
         theme: { color: '#3f51b5' }
       };
+
+      // 4. Open the Razorpay payment modal
       const rzp = new window.Razorpay(options);
       rzp.open();
-      rzp.on('payment.failed', (response) => alert(`Payment Failed: ${response.error.description}`));
-    } catch (err) { alert(`Payment initiation failed: ${err.message}`); }
+      rzp.on('payment.failed', function (response) {
+          console.error('Razorpay Payment Failed:', response.error);
+          setPaymentError(`Payment Failed: ${response.error.description}`); // Show detailed error
+      });
+
+    } catch (err) {
+      console.error('Payment initiation failed:', err);
+      setPaymentError(`Payment initiation failed: ${err.message}`); // Show initiation error
+    }
   };
 
+  // Function to generate and download PDF
   const handleDownloadPDF = (invoice) => {
-    // ... (Your corrected handleDownloadPDF function using ₹ or INR) ...
+    // ... (Your PDF generation code using ₹ or INR) ...
      const doc = new jsPDF();
      doc.setFontSize(22); doc.text('Invoice', 20, 20);
      doc.setFontSize(14); doc.text('From:', 20, 35); doc.setFontSize(12); doc.text('Your Company Inc.', 20, 42);
@@ -74,17 +130,19 @@ function InvoiceList({ invoices, onListChange }) {
      doc.save(`invoice-${invoice._id.slice(-6)}.pdf`);
   };
 
+  // Function to mark an invoice as paid manually
   const handleMarkAsPaid = (id) => {
     const token = localStorage.getItem('token'); if (!token) return;
     // Use environment variable for API URL
     fetch(`${process.env.REACT_APP_API_URL}/api/invoices/${id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
     })
-    .then(res => res.ok ? res.json() : Promise.reject('Failed mark as paid'))
+    .then(res => { if (!res.ok) { return res.json().then(err => Promise.reject(err)); } return res.json(); })
     .then(data => { console.log('Marked as paid:', data); onListChange(); })
-    .catch(err => alert(`Error: ${err.message || err}`));
+    .catch(err => { console.error('Error marking as paid:', err); alert(`Error: ${err.message || 'Could not mark as paid'}`); });
   };
 
+  // Function to delete an invoice
   const handleDelete = (id) => {
     if (!window.confirm('Delete this invoice?')) return;
     const token = localStorage.getItem('token'); if (!token) return;
@@ -92,15 +150,19 @@ function InvoiceList({ invoices, onListChange }) {
     fetch(`${process.env.REACT_APP_API_URL}/api/invoices/${id}`, {
       method: 'DELETE', headers: { 'x-auth-token': token }
     })
-    .then(res => res.ok ? res.json() : Promise.reject('Failed to delete'))
+    .then(res => { if (!res.ok) { return res.json().then(err => Promise.reject(err)); } return res.json(); })
     .then(data => { console.log(data.message); onListChange(); })
-    .catch(err => alert(`Error: ${err.message || err}`));
+    .catch(err => { console.error('Error deleting:', err); alert(`Error: ${err.message || 'Could not delete invoice'}`); });
   };
 
+  // Render the component
   return (
     <Box>
       <Typography variant="h5" component="h2" gutterBottom>All Invoices</Typography>
-      {invoices.length === 0 ? (<Typography>No invoices found.</Typography>) : (
+      {/* Display general payment system error if key failed to load */}
+      {paymentError && <Alert severity="error" sx={{ mb: 2 }}>{paymentError}</Alert>}
+
+      {invoices.length === 0 ? (<Typography>No invoices found. Add one above!</Typography>) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {invoices.map(invoice => (
             <Card key={invoice._id} elevation={2} sx={{ display: 'flex', flexDirection: 'column' }}>
