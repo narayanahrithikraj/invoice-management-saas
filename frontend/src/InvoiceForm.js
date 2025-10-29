@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, TextField, Box, Typography, Paper, Grid } from '@mui/material';
+import { Button, TextField, Box, Typography, Paper, Grid, Alert } from '@mui/material'; // Added Alert
 
 function InvoiceForm({ onInvoiceCreated }) {
   const [clientName, setClientName] = useState('');
@@ -33,7 +33,9 @@ function InvoiceForm({ onInvoiceCreated }) {
 
     try {
         // Use environment variable for API URL
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/invoices`, {
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000'; // Fallback for safety
+
+        const response = await fetch(`${apiUrl}/api/invoices`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
