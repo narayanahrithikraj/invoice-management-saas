@@ -25,7 +25,7 @@ const port = process.env.PORT || 5000;
 // Define allowed origins
 const allowedOrigins = [
     'http://localhost:3000', // Allow local development frontend
-    'https://invoicemanagementsaas.vercel.app' // Allow your deployed Vercel frontend
+    'https://saasinvoicemanagement.vercel.app' // Allow your deployed Vercel frontend
 ];
 
 const corsOptions = {
