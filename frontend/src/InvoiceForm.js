@@ -30,10 +30,9 @@ function InvoiceForm({ onInvoiceCreated }) {
         return;
     }
 
-
     try {
-        // Use environment variable for API URL
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000'; // Fallback for safety
+        // Use environment variable for deployed URL, fallback to localhost for development
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
         const response = await fetch(`${apiUrl}/api/invoices`, {
             method: 'POST',
@@ -54,23 +53,25 @@ function InvoiceForm({ onInvoiceCreated }) {
             setDescription('');
             setAmount('');
         } else {
+             // Use error message from backend if available
              throw new Error(data.message || 'Failed to create invoice.');
         }
     } catch (err) {
         console.error("Error creating invoice:", err);
-        setFormError(`Failed to create invoice: ${err.message}`); // Show error on form
+        // Show the error message to the user
+        setFormError(err.message || 'Failed to create invoice. Check network connection.');
     }
   };
 
   return (
     <Paper
-      elevation={2} // Use slight elevation or outlined
-      variant="outlined"
+      elevation={2} // Use slight elevation
+      variant="outlined" // Add a border
       sx={{
         padding: 3,
         marginBottom: 4,
         borderRadius: 2,
-        borderColor: 'divider'
+        borderColor: 'divider' // Use theme's divider color for border
       }}
     >
       <Typography variant="h5" component="h2" gutterBottom>
@@ -95,8 +96,8 @@ function InvoiceForm({ onInvoiceCreated }) {
               variant="outlined"
               value={clientEmail}
               onChange={(e) => setClientEmail(e.target.value)}
-              // Consider making email required based on your needs
               fullWidth
+              // Email is not strictly required by model, but you can add 'required' prop here if you want
             />
           </Grid>
           <Grid item xs={12}>
@@ -111,7 +112,7 @@ function InvoiceForm({ onInvoiceCreated }) {
           </Grid>
           <Grid item xs={12} sm={6}>
             <TextField
-              label="Amount (₹)" // Display Rupee symbol here
+              label="Amount (₹)" // Display Rupee symbol in label
               type="number"
               variant="outlined"
               value={amount}
@@ -133,7 +134,11 @@ function InvoiceForm({ onInvoiceCreated }) {
             </Button>
           </Grid>
           {/* Display form submission errors */}
-          {formError && <Grid item xs={12}><Alert severity="error">{formError}</Alert></Grid>}
+          {formError && (
+            <Grid item xs={12}>
+              <Alert severity="error">{formError}</Alert>
+            </Grid>
+          )}
         </Grid>
       </Box>
     </Paper>
